@@ -1,0 +1,392 @@
+<div id="ai-modal-backdrop" class="ai-backdrop">
+  <div class="ai-modal">
+    <button
+      class="ai-close"
+      aria-label="Close"
+      onclick="closeAiModal()"
+    >
+      ×
+    </button>
+
+    <div class="ai-modal-scroll">
+      <div id="ai-loading" class="ai-loading">
+        <div class="spinner"></div>
+        <p>Generating AI summary...</p>
+      </div>
+
+      <div id="ai-content" class="ai-content hidden">
+        <h2 id="ai-title"></h2>
+
+        <ul id="ai-list" class="ai-list"></ul>
+      </div>
+
+      <div id="ai-error" class="ai-error hidden">
+        Unable to generate summary.
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.ai-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+
+  background: rgba(0, 0, 0, 0.7);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.ai-backdrop.active {
+  display: flex;
+  opacity: 1;
+}
+
+.ai-modal {
+  position: relative;
+
+  width: 100%;
+  max-width: 720px;
+
+  background: #171b22;
+
+  border: 1px solid #2a313d;
+
+  border-radius: 24px;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 30px 80px rgba(0,0,0,.65);
+
+  transform: translateY(30px);
+
+  animation: modalIn .25s ease forwards;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-modal-scroll {
+  padding: 26px;
+
+  max-height: 85vh;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.ai-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+
+  width: 42px;
+  height: 42px;
+
+  border: none;
+
+  border-radius: 50%;
+
+  cursor: pointer;
+
+  background: #242b37;
+
+  color: white;
+
+  font-size: 24px;
+
+  transition: .2s;
+}
+
+.ai-close:hover {
+  background: #313a49;
+}
+
+.ai-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 18px;
+
+  min-height: 220px;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+
+  border-radius: 50%;
+
+  border: 4px solid #2c3644;
+  border-top-color: #7c6dff;
+
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-loading p {
+  margin: 0;
+  color: #c9d2df;
+}
+
+.ai-content h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+
+  color: white;
+
+  line-height: 1.4;
+
+  font-size: 1.5rem;
+}
+
+.ai-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.ai-list li {
+  color: #d4dbe6;
+
+  margin-bottom: 16px;
+
+  line-height: 1.8;
+}
+
+.ai-error {
+  text-align: center;
+
+  color: #ff6b6b;
+
+  padding: 30px 10px;
+}
+
+.hidden {
+  display: none;
+}
+
+body.modal-open {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
+@media (max-width: 768px) {
+  .ai-modal {
+    width: 100%;
+    border-radius: 18px;
+  }
+
+  .ai-modal-scroll {
+    padding: 20px;
+    max-height: 85vh;
+  }
+
+  .ai-content h2 {
+    font-size: 1.2rem;
+  }
+}
+</style>
+
+<script is:inline>
+const backdrop =
+  document.getElementById(
+    "ai-modal-backdrop"
+  );
+
+const loadingBox =
+  document.getElementById(
+    "ai-loading"
+  );
+
+const contentBox =
+  document.getElementById(
+    "ai-content"
+  );
+
+const errorBox =
+  document.getElementById(
+    "ai-error"
+  );
+
+const titleBox =
+  document.getElementById(
+    "ai-title"
+  );
+
+const listBox =
+  document.getElementById(
+    "ai-list"
+  );
+
+window.closeAiModal = function () {
+  backdrop.classList.remove("active");
+
+  document.body.classList.remove(
+    "modal-open"
+  );
+};
+
+window.openAiModal = async function (
+  title,
+  textData
+) {
+  backdrop.classList.add("active");
+
+  document.body.classList.add(
+    "modal-open"
+  );
+
+  loadingBox.classList.remove("hidden");
+  contentBox.classList.add("hidden");
+  errorBox.classList.add("hidden");
+
+  titleBox.textContent = "";
+  listBox.innerHTML = "";
+
+  try {
+    const language =
+      navigator.language ||
+      navigator.userLanguage ||
+      "en";
+
+    const response = await fetch(
+      "/api/summarize",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body: JSON.stringify({
+          title,
+          text: textData,
+          language
+        })
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        "API request failed"
+      );
+    }
+
+    const data =
+      await response.json();
+
+    loadingBox.classList.add(
+      "hidden"
+    );
+
+    contentBox.classList.remove(
+      "hidden"
+    );
+
+    titleBox.textContent =
+      data.translatedTitle ||
+      title;
+
+    const bullets = [
+      data.bullet1,
+      data.bullet2,
+      data.bullet3
+    ].filter(Boolean);
+
+    listBox.innerHTML = bullets
+      .map(
+        (item) =>
+          `<li>${escapeHtml(
+            item
+          )}</li>`
+      )
+      .join("");
+  } catch (err) {
+    console.error(err);
+
+    loadingBox.classList.add(
+      "hidden"
+    );
+
+    errorBox.classList.remove(
+      "hidden"
+    );
+  }
+};
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+}
+
+backdrop.addEventListener(
+  "click",
+  (event) => {
+    if (
+      event.target === backdrop
+    ) {
+      closeAiModal();
+    }
+  }
+);
+
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.key === "Escape" &&
+      backdrop.classList.contains(
+        "active"
+      )
+    ) {
+      closeAiModal();
+    }
+  }
+);
+</script>
