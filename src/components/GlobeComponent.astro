@@ -1,17 +1,14 @@
 ---
 import { countries } from "../data/countries.js";
 ---
+
 <div id="planet-pulse-globe"></div>
 
-<script define:vars={{ countries }} type="module">
-<script type="module">
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+<script type="module" define:vars={{ countries }}>
+import * as THREE from "three";
 
 const container = document.getElementById("planet-pulse-globe");
-
-if (!container) {
-  throw new Error("Globe container not found");
-}
+if (!container) throw new Error("Globe container not found");
 
 const scene = new THREE.Scene();
 
@@ -30,14 +27,8 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: "high-performance"
 });
 
-renderer.setPixelRatio(
-  Math.min(window.devicePixelRatio, 2)
-);
-
-renderer.setSize(
-  window.innerWidth,
-  window.innerHeight
-);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
 
 container.appendChild(renderer.domElement);
 
@@ -46,21 +37,15 @@ container.appendChild(renderer.domElement);
 const starGeometry = new THREE.BufferGeometry();
 const starCount = 4000;
 
-const starPositions = new Float32Array(
-  starCount * 3
-);
+const starPositions = new Float32Array(starCount * 3);
 
 for (let i = 0; i < starCount * 3; i++) {
-  starPositions[i] =
-    (Math.random() - 0.5) * 1000;
+  starPositions[i] = (Math.random() - 0.5) * 1000;
 }
 
 starGeometry.setAttribute(
   "position",
-  new THREE.BufferAttribute(
-    starPositions,
-    3
-  )
+  new THREE.BufferAttribute(starPositions, 3)
 );
 
 const starMaterial = new THREE.PointsMaterial({
@@ -70,90 +55,50 @@ const starMaterial = new THREE.PointsMaterial({
   opacity: 0.9
 });
 
-const stars = new THREE.Points(
-  starGeometry,
-  starMaterial
-);
-
+const stars = new THREE.Points(starGeometry, starMaterial);
 scene.add(stars);
 
 /* ---------- GLOBE ---------- */
 
 const globeGroup = new THREE.Group();
-
 scene.add(globeGroup);
 
 const globeRadius = 3;
 
-const globeGeometry =
-  new THREE.SphereGeometry(
-    globeRadius,
-    64,
-    64
-  );
+const globeGeometry = new THREE.SphereGeometry(globeRadius, 64, 64);
 
-const globeMaterial =
-  new THREE.MeshBasicMaterial({
-    color: 0x2a3442,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.85
-  });
+const globeMaterial = new THREE.MeshBasicMaterial({
+  color: 0x2a3442,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.85
+});
 
-const globe = new THREE.Mesh(
-  globeGeometry,
-  globeMaterial
-);
-
+const globe = new THREE.Mesh(globeGeometry, globeMaterial);
 globeGroup.add(globe);
 
-/* ---------- MARKERS ---------- */
+/* ---------- LAT/LNG ---------- */
 
-function latLngToVector3(
-  lat,
-  lng,
-  radius
-) {
-  const phi =
-    (90 - lat) *
-    (Math.PI / 180);
-
-  const theta =
-    (lng + 180) *
-    (Math.PI / 180);
+function latLngToVector3(lat, lng, radius) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
 
   return new THREE.Vector3(
-    -(
-      radius *
-      Math.sin(phi) *
-      Math.cos(theta)
-    ),
+    -(radius * Math.sin(phi) * Math.cos(theta)),
     radius * Math.cos(phi),
-    radius *
-      Math.sin(phi) *
-      Math.sin(theta)
+    radius * Math.sin(phi) * Math.sin(theta)
   );
 }
 
-const markerGeometry =
-  new THREE.SphereGeometry(
-    0.04,
-    10,
-    10
-  );
+/* ---------- MARKERS ---------- */
 
-const markerMaterial =
-  new THREE.MeshBasicMaterial({
-    color: 0x4fc3ff
-  });
+const markerGeometry = new THREE.SphereGeometry(0.04, 10, 10);
+const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x4fc3ff });
 
 const markers = [];
 
 countries.forEach((country) => {
-  const marker = new THREE.Mesh(
-    markerGeometry,
-    markerMaterial
-  );
+  const marker = new THREE.Mesh(markerGeometry, markerMaterial);
 
   const pos = latLngToVector3(
     country.lat,
@@ -165,271 +110,144 @@ countries.forEach((country) => {
 
   marker.userData = {
     code: country.code,
-    name: country.name,
     targetPosition: pos.clone()
   };
 
   globeGroup.add(marker);
-
   markers.push(marker);
 });
 
-/* ---------- INTERACTION ---------- */
+/* ---------- RAYCAST ---------- */
 
-const raycaster =
-  new THREE.Raycaster();
-
-const pointer =
-  new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
 
 let isAnimating = false;
 
-function performRaycast(
-  clientX,
-  clientY
-) {
+function performRaycast(clientX, clientY) {
   if (isAnimating) return;
 
-  pointer.x =
-    (clientX / window.innerWidth) *
-      2 -
-    1;
+  pointer.x = (clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(clientY / window.innerHeight) * 2 + 1;
 
-  pointer.y =
-    -(clientY /
-      window.innerHeight) *
-      2 +
-    1;
+  raycaster.setFromCamera(pointer, camera);
 
-  raycaster.setFromCamera(
-    pointer,
-    camera
-  );
-
-  const hits =
-    raycaster.intersectObjects(
-      markers
-    );
-
+  const hits = raycaster.intersectObjects(markers);
   if (!hits.length) return;
 
   focusCountry(hits[0].object);
 }
 
+/* ---------- FOCUS ANIMATION ---------- */
+
 function focusCountry(marker) {
   isAnimating = true;
 
-  const countryCode =
-    marker.userData.code.toLowerCase();
+  const countryCode = marker.userData.code.toLowerCase();
 
-  const startRotationY =
-    globeGroup.rotation.y;
+  const startRotY = globeGroup.rotation.y;
+  const startRotX = globeGroup.rotation.x;
 
-  const startRotationX =
-    globeGroup.rotation.x;
+  const worldPos = marker.userData.targetPosition.clone();
 
-  const worldPos =
-    marker.userData.targetPosition.clone();
+  const targetRotY = Math.atan2(worldPos.x, worldPos.z);
+  const targetRotX = -Math.asin(worldPos.y / worldPos.length());
 
-  const targetRotY =
-    Math.atan2(
-      worldPos.x,
-      worldPos.z
-    );
-
-  const targetRotX =
-    -Math.asin(
-      worldPos.y /
-        worldPos.length()
-    );
-
-  const startZ =
-    camera.position.z;
-
+  const startZ = camera.position.z;
   const targetZ = 5.2;
 
-  const duration = 1400;
+  const duration = 1200;
+  const start = performance.now();
 
-  const start =
-    performance.now();
-
-  function animateFocus(now) {
-    const elapsed =
-      now - start;
-
-    const t = Math.min(
-      elapsed / duration,
-      1
-    );
-
-    const ease =
-      1 -
-      Math.pow(
-        1 - t,
-        3
-      );
+  function animate(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
 
     globeGroup.rotation.y =
-      startRotationY +
-      (-targetRotY -
-        startRotationY) *
-        ease;
+      startRotY + (-targetRotY - startRotY) * ease;
 
     globeGroup.rotation.x =
-      startRotationX +
-      (targetRotX -
-        startRotationX) *
-        ease;
+      startRotX + (targetRotX - startRotX) * ease;
 
     camera.position.z =
-      startZ +
-      (targetZ - startZ) *
-        ease;
+      startZ + (targetZ - startZ) * ease;
 
     if (t < 1) {
-      requestAnimationFrame(
-        animateFocus
-      );
+      requestAnimationFrame(animate);
     } else {
-      window.location.href =
-        `/?country=${countryCode}`;
+      window.location.href = `/?country=${countryCode}`;
     }
   }
 
-  requestAnimationFrame(
-    animateFocus
-  );
+  requestAnimationFrame(animate);
 }
 
-function onClick(event) {
-  performRaycast(
-    event.clientX,
-    event.clientY
-  );
+/* ---------- EVENTS ---------- */
+
+function onClick(e) {
+  performRaycast(e.clientX, e.clientY);
 }
 
-function onTouch(event) {
-  const touch =
-    event.changedTouches[0];
-
-  performRaycast(
-    touch.clientX,
-    touch.clientY
-  );
+function onTouch(e) {
+  const t = e.changedTouches[0];
+  performRaycast(t.clientX, t.clientY);
 }
 
-window.addEventListener(
-  "click",
-  onClick,
-  { passive: true }
-);
-
-window.addEventListener(
-  "touchend",
-  onTouch,
-  { passive: true }
-);
+window.addEventListener("click", onClick, { passive: true });
+window.addEventListener("touchend", onTouch, { passive: true });
 
 /* ---------- RESIZE ---------- */
 
 function onResize() {
-  camera.aspect =
-    window.innerWidth /
-    window.innerHeight;
-
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
-  renderer.setPixelRatio(
-    Math.min(
-      window.devicePixelRatio,
-      2
-    )
-  );
-
-  renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-  );
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-window.addEventListener(
-  "resize",
-  onResize
-);
+window.addEventListener("resize", onResize);
 
-/* ---------- ANIMATION ---------- */
+/* ---------- ANIMATE ---------- */
 
 let frameId;
 
 function animate() {
-  frameId =
-    requestAnimationFrame(
-      animate
-    );
+  frameId = requestAnimationFrame(animate);
 
   if (!isAnimating) {
-    globeGroup.rotation.y +=
-      0.0022;
+    globeGroup.rotation.y += 0.0022;
   }
 
-  stars.rotation.y +=
-    0.00015;
+  stars.rotation.y += 0.00015;
 
-  renderer.render(
-    scene,
-    camera
-  );
+  renderer.render(scene, camera);
 }
 
 animate();
 
 /* ---------- CLEANUP ---------- */
 
-window.addEventListener(
-  "beforeunload",
-  () => {
-    cancelAnimationFrame(
-      frameId
-    );
+window.addEventListener("beforeunload", () => {
+  cancelAnimationFrame(frameId);
 
-    window.removeEventListener(
-      "resize",
-      onResize
-    );
+  window.removeEventListener("resize", onResize);
+  window.removeEventListener("click", onClick);
+  window.removeEventListener("touchend", onTouch);
 
-    window.removeEventListener(
-      "click",
-      onClick
-    );
+  globeGeometry.dispose();
+  globeMaterial.dispose();
+  markerGeometry.dispose();
+  markerMaterial.dispose();
+  starGeometry.dispose();
+  starMaterial.dispose();
 
-    window.removeEventListener(
-      "touchend",
-      onTouch
-    );
+  renderer.dispose();
 
-    globeGeometry.dispose();
-    globeMaterial.dispose();
-
-    markerGeometry.dispose();
-    markerMaterial.dispose();
-
-    starGeometry.dispose();
-    starMaterial.dispose();
-
-    renderer.dispose();
-
-    if (
-      renderer.domElement &&
-      container.contains(
-        renderer.domElement
-      )
-    ) {
-      container.removeChild(
-        renderer.domElement
-      );
-    }
+  if (renderer.domElement && container.contains(renderer.domElement)) {
+    container.removeChild(renderer.domElement);
   }
-);
+});
 </script>
 
 <style>
@@ -439,19 +257,13 @@ window.addEventListener(
   width: 100%;
   height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(
-      circle at center,
-      #131a22 0%,
-      #0b0d10 60%,
-      #050608 100%
-    );
+  background: radial-gradient(circle at center, #131a22 0%, #0b0d10 60%, #050608 100%);
 }
 
 canvas {
-  display: block;
   width: 100%;
   height: 100%;
+  display: block;
   touch-action: manipulation;
 }
 </style>
