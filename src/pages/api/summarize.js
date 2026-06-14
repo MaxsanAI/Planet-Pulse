@@ -4,16 +4,17 @@ export const POST = async ({ request, locals }) => {
   try {
     const body = await request.json();
 
-    const title = String(body?.title || "");
-    const text = String(body?.text || "");
-    const language = String(
-      body?.language || "en"
-    ).trim();
+    const title = String(body?.title || "").trim();
+    const text = String(body?.text || "").trim();
+    const language = String(body?.language || "en").trim();
 
     if (!title && !text) {
       return new Response(
         JSON.stringify({
-          error: "Missing content"
+          translatedTitle: "",
+          bullet1: "Missing content",
+          bullet2: "",
+          bullet3: ""
         }),
         {
           status: 400,
@@ -29,7 +30,10 @@ export const POST = async ({ request, locals }) => {
     if (!ai) {
       return new Response(
         JSON.stringify({
-          error: "Cloudflare AI binding missing"
+          translatedTitle: title || "Error",
+          bullet1: "AI binding missing",
+          bullet2: "",
+          bullet3: ""
         }),
         {
           status: 500,
@@ -43,19 +47,15 @@ export const POST = async ({ request, locals }) => {
     const systemPrompt = `
 You are Planet Pulse AI.
 
-Analyze the news article.
+Return ONLY valid JSON.
 
-IMPORTANT RULES:
+Rules:
+- Translate everything into requested language
+- If language is invalid, use English
+- No markdown
+- No extra keys
 
-1. Translate EVERYTHING into the requested target language.
-2. If the requested language is unclear or unsupported, use English.
-3. Return ONLY valid JSON.
-4. No markdown.
-5. No explanations.
-6. No extra keys.
-
-Required JSON structure:
-
+JSON format:
 {
   "translatedTitle": "",
   "bullet1": "",
@@ -65,14 +65,11 @@ Required JSON structure:
 `;
 
     const userPrompt = `
-Target Language:
-${language}
+Language: ${language}
 
-News Title:
-${title}
+Title: ${title}
 
-News Content:
-${text}
+Content: ${text}
 `;
 
     const result = await ai.run(
@@ -91,7 +88,7 @@ ${text}
         response_format: {
           type: "json_object"
         },
-        max_tokens: 400
+        max_tokens: 350
       }
     );
 
@@ -103,12 +100,23 @@ ${text}
       } catch {
         output = {
           translatedTitle: title,
-          bullet1: "Summary unavailable.",
+          bullet1: "Summary unavailable",
           bullet2: "",
           bullet3: ""
         };
       }
     }
+
+    output = {
+      translatedTitle:
+        output?.translatedTitle || title,
+      bullet1:
+        output?.bullet1 || "",
+      bullet2:
+        output?.bullet2 || "",
+      bullet3:
+        output?.bullet3 || ""
+    };
 
     return new Response(
       JSON.stringify(output),
@@ -121,11 +129,11 @@ ${text}
       }
     );
   } catch (error) {
-    console.error(error);
+    console.error("AI ERROR:", error);
 
     return new Response(
       JSON.stringify({
-        translatedTitle: "Summary Error",
+        translatedTitle: "Error",
         bullet1: "Unable to generate summary.",
         bullet2: "",
         bullet3: ""
