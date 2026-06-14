@@ -8,7 +8,6 @@ import { countries } from "../data/countries.js";
 import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 
 const container = document.getElementById("planet-pulse-globe");
-
 if (!container) throw new Error("Globe container not found");
 
 /* ---------- SCENE ---------- */
@@ -33,14 +32,32 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 container.appendChild(renderer.domElement);
 
+/* ---------- LIGHT ---------- */
+scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+dirLight.position.set(5, 3, 5);
+scene.add(dirLight);
+
+/* ---------- TEXTURES ---------- */
+const loader = new THREE.TextureLoader();
+
+const earthMap = loader.load(
+  "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg"
+);
+
+const cloudsMap = loader.load(
+  "https://threejs.org/examples/textures/planets/earth_clouds_1024.png"
+);
+
 /* ---------- STARFIELD ---------- */
 const starGeometry = new THREE.BufferGeometry();
-const starCount = 4000;
+const starCount = 5000;
 
 const starPositions = new Float32Array(starCount * 3);
 
 for (let i = 0; i < starPositions.length; i++) {
-  starPositions[i] = (Math.random() - 0.5) * 1000;
+  starPositions[i] = (Math.random() - 0.5) * 1200;
 }
 
 starGeometry.setAttribute(
@@ -51,10 +68,10 @@ starGeometry.setAttribute(
 const stars = new THREE.Points(
   starGeometry,
   new THREE.PointsMaterial({
-    size: 0.8,
+    size: 0.7,
     color: 0xffffff,
-    transparent: true,
-    opacity: 0.9
+    opacity: 0.8,
+    transparent: true
   })
 );
 
@@ -66,17 +83,28 @@ scene.add(globeGroup);
 
 const globeRadius = 3;
 
-const globe = new THREE.Mesh(
+const earth = new THREE.Mesh(
   new THREE.SphereGeometry(globeRadius, 64, 64),
-  new THREE.MeshBasicMaterial({
-    color: 0x2a3442,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.85
+  new THREE.MeshStandardMaterial({
+    map: earthMap,
+    roughness: 1,
+    metalness: 0
   })
 );
 
-globeGroup.add(globe);
+globeGroup.add(earth);
+
+/* CLOUDS */
+const clouds = new THREE.Mesh(
+  new THREE.SphereGeometry(globeRadius + 0.03, 64, 64),
+  new THREE.MeshStandardMaterial({
+    map: cloudsMap,
+    transparent: true,
+    opacity: 0.45
+  })
+);
+
+globeGroup.add(clouds);
 
 /* ---------- LAT/LNG ---------- */
 function latLngToVector3(lat, lng, radius) {
@@ -91,7 +119,7 @@ function latLngToVector3(lat, lng, radius) {
 }
 
 /* ---------- MARKERS ---------- */
-const markerGeometry = new THREE.SphereGeometry(0.04, 10, 10);
+const markerGeometry = new THREE.SphereGeometry(0.05, 10, 10);
 const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x4fc3ff });
 
 const markers = [];
@@ -117,7 +145,7 @@ const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let isAnimating = false;
 
-function onPick(x, y) {
+function pick(x, y) {
   if (isAnimating) return;
 
   pointer.x = (x / window.innerWidth) * 2 - 1;
@@ -173,11 +201,11 @@ function focus(marker) {
 }
 
 /* ---------- EVENTS ---------- */
-window.addEventListener("click", (e) => onPick(e.clientX, e.clientY), { passive: true });
+window.addEventListener("click", (e) => pick(e.clientX, e.clientY), { passive: true });
 
 window.addEventListener("touchend", (e) => {
   const t = e.changedTouches[0];
-  onPick(t.clientX, t.clientY);
+  pick(t.clientX, t.clientY);
 }, { passive: true });
 
 /* ---------- RESIZE ---------- */
@@ -195,7 +223,8 @@ let frame;
 function animate() {
   frame = requestAnimationFrame(animate);
 
-  if (!isAnimating) globeGroup.rotation.y += 0.0022;
+  if (!isAnimating) globeGroup.rotation.y += 0.002;
+  clouds.rotation.y += 0.0004;
   stars.rotation.y += 0.00015;
 
   renderer.render(scene, camera);
@@ -214,7 +243,7 @@ window.addEventListener("beforeunload", () => {
 #planet-pulse-globe {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle, #131a22 0%, #050608 100%);
+  background: radial-gradient(circle, #0b0f14 0%, #050608 100%);
   overflow: hidden;
 }
 
