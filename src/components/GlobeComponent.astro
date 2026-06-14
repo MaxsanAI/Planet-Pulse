@@ -1,0 +1,362 @@
+---
+/**
+ * src/components/GlobeComponent.astro
+ */
+---
+
+<div id="planet-pulse-globe"></div>
+
+<script type="module">
+import * as THREE from "three";
+
+const container = document.getElementById("planet-pulse-globe");
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  50,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  2000
+);
+
+camera.position.set(0, 0, 10);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true,
+  powerPreference: "high-performance"
+});
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+container.appendChild(renderer.domElement);
+
+/* ---------- STARFIELD ---------- */
+
+const starGeometry = new THREE.BufferGeometry();
+const starCount = 4000;
+
+const starPositions = new Float32Array(starCount * 3);
+
+for (let i = 0; i < starCount * 3; i++) {
+  starPositions[i] = (Math.random() - 0.5) * 1000;
+}
+
+starGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(starPositions, 3)
+);
+
+const starMaterial = new THREE.PointsMaterial({
+  size: 0.8,
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.9
+});
+
+const stars = new THREE.Points(starGeometry, starMaterial);
+scene.add(stars);
+
+/* ---------- GLOBE ---------- */
+
+const globeGroup = new THREE.Group();
+scene.add(globeGroup);
+
+const globeRadius = 3;
+
+const globeGeometry = new THREE.SphereGeometry(
+  globeRadius,
+  64,
+  64
+);
+
+const globeMaterial = new THREE.MeshBasicMaterial({
+  color: 0x2a3442,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.85
+});
+
+const globe = new THREE.Mesh(
+  globeGeometry,
+  globeMaterial
+);
+
+globeGroup.add(globe);
+
+/* ---------- MARKERS ---------- */
+
+const countries = [
+  { code: "US", lat: 38, lng: -97 },
+  { code: "CA", lat: 56, lng: -106 },
+  { code: "MX", lat: 23, lng: -102 },
+  { code: "BR", lat: -14, lng: -51 },
+  { code: "AR", lat: -34, lng: -64 },
+  { code: "GB", lat: 55, lng: -3 },
+  { code: "FR", lat: 46, lng: 2 },
+  { code: "DE", lat: 51, lng: 10 },
+  { code: "ES", lat: 40, lng: -4 },
+  { code: "IT", lat: 42.5, lng: 12.5 },
+  { code: "RU", lat: 61, lng: 105 },
+  { code: "UA", lat: 49, lng: 32 },
+  { code: "TR", lat: 39, lng: 35 },
+  { code: "SA", lat: 24, lng: 45 },
+  { code: "EG", lat: 26, lng: 30 },
+  { code: "ZA", lat: -30, lng: 25 },
+  { code: "NG", lat: 9, lng: 8 },
+  { code: "KE", lat: 1, lng: 38 },
+  { code: "IN", lat: 21, lng: 78 },
+  { code: "PK", lat: 30, lng: 70 },
+  { code: "BD", lat: 24, lng: 90 },
+  { code: "CN", lat: 35, lng: 103 },
+  { code: "JP", lat: 36, lng: 138 },
+  { code: "KR", lat: 36, lng: 128 },
+  { code: "ID", lat: -2, lng: 118 },
+  { code: "TH", lat: 15, lng: 101 },
+  { code: "VN", lat: 16, lng: 108 },
+  { code: "PH", lat: 13, lng: 122 },
+  { code: "AU", lat: -25, lng: 133 },
+  { code: "NZ", lat: -41, lng: 174 }
+];
+
+function latLngToVector3(lat, lng, radius) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
+
+  return new THREE.Vector3(
+    -(radius * Math.sin(phi) * Math.cos(theta)),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+const markerGeometry = new THREE.SphereGeometry(
+  0.06,
+  12,
+  12
+);
+
+const markers = [];
+
+countries.forEach((country) => {
+  const marker = new THREE.Mesh(
+    markerGeometry,
+    new THREE.MeshBasicMaterial({
+      color: 0x4fc3ff
+    })
+  );
+
+  const pos = latLngToVector3(
+    country.lat,
+    country.lng,
+    globeRadius + 0.05
+  );
+
+  marker.position.copy(pos);
+
+  marker.userData = {
+    code: country.code,
+    targetPosition: pos.clone()
+  };
+
+  globeGroup.add(marker);
+  markers.push(marker);
+});
+
+/* ---------- INTERACTION ---------- */
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+let isAnimating = false;
+
+function performRaycast(clientX, clientY) {
+  if (isAnimating) return;
+
+  pointer.x = (clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(pointer, camera);
+
+  const hits = raycaster.intersectObjects(markers);
+
+  if (!hits.length) return;
+
+  const marker = hits[0].object;
+
+  focusCountry(marker);
+}
+
+function focusCountry(marker) {
+  isAnimating = true;
+
+  const countryCode =
+    marker.userData.code.toLowerCase();
+
+  const startRotationY = globeGroup.rotation.y;
+  const startRotationX = globeGroup.rotation.x;
+
+  const worldPos =
+    marker.userData.targetPosition.clone();
+
+  const targetRotY =
+    Math.atan2(worldPos.x, worldPos.z);
+
+  const targetRotX =
+    -Math.asin(worldPos.y / worldPos.length());
+
+  const startZ = camera.position.z;
+  const targetZ = 5.2;
+
+  const duration = 1400;
+  const start = performance.now();
+
+  function animateFocus(now) {
+    const elapsed = now - start;
+    const t = Math.min(elapsed / duration, 1);
+
+    const ease =
+      1 - Math.pow(1 - t, 3);
+
+    globeGroup.rotation.y =
+      startRotationY + (-targetRotY - startRotationY) * ease;
+
+    globeGroup.rotation.x =
+      startRotationX + (targetRotX - startRotationX) * ease;
+
+    camera.position.z =
+      startZ + (targetZ - startZ) * ease;
+
+    if (t < 1) {
+      requestAnimationFrame(animateFocus);
+    } else {
+      window.location.href =
+        `/?country=${countryCode}`;
+    }
+  }
+
+  requestAnimationFrame(animateFocus);
+}
+
+function onClick(e) {
+  performRaycast(e.clientX, e.clientY);
+}
+
+function onTouch(e) {
+  const touch = e.changedTouches[0];
+
+  performRaycast(
+    touch.clientX,
+    touch.clientY
+  );
+}
+
+window.addEventListener("click", onClick, {
+  passive: true
+});
+
+window.addEventListener("touchend", onTouch, {
+  passive: true
+});
+
+/* ---------- RESIZE ---------- */
+
+function onResize() {
+  camera.aspect =
+    window.innerWidth / window.innerHeight;
+
+  camera.updateProjectionMatrix();
+
+  renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 2)
+  );
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
+}
+
+window.addEventListener(
+  "resize",
+  onResize
+);
+
+/* ---------- ANIMATION ---------- */
+
+let frameId;
+
+function animate() {
+  frameId = requestAnimationFrame(
+    animate
+  );
+
+  if (!isAnimating) {
+    globeGroup.rotation.y += 0.0022;
+  }
+
+  stars.rotation.y += 0.00015;
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* ---------- CLEANUP ---------- */
+
+window.addEventListener("beforeunload", () => {
+  cancelAnimationFrame(frameId);
+
+  window.removeEventListener(
+    "resize",
+    onResize
+  );
+
+  window.removeEventListener(
+    "click",
+    onClick
+  );
+
+  window.removeEventListener(
+    "touchend",
+    onTouch
+  );
+
+  globeGeometry.dispose();
+  globeMaterial.dispose();
+
+  markerGeometry.dispose();
+
+  renderer.dispose();
+
+  container?.removeChild(
+    renderer.domElement
+  );
+});
+</script>
+
+<style>
+#planet-pulse-globe {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at center,
+      #131a22 0%,
+      #0b0d10 60%,
+      #050608 100%
+    );
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation;
+}
+</style>
