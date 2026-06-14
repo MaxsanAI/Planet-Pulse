@@ -4,7 +4,8 @@ import { countries } from "../data/countries.js";
 <div id="planet-pulse-globe"></div>
 
 <script define:vars={{ countries }} type="module">
-import * as THREE from "three";
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 const container = document.getElementById("planet-pulse-globe");
 
