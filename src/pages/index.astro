@@ -3,11 +3,17 @@ import GlobeComponent from "../components/GlobeComponent.astro";
 import NewsCard from "../components/NewsCard.astro";
 import AiModal from "../components/AiModal.astro";
 import { parseRss } from "../utils/rssParser";
+import { countries } from "../data/countryMap";
 
 const country =
   Astro.url.searchParams
     .get("country")
     ?.toUpperCase() || null;
+
+const countryName =
+  countries.find(
+    (c) => c.code === country
+  )?.name || country;
 
 let articles = [];
 
@@ -25,21 +31,15 @@ if (country) {
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1.0"
-/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <title>
   {country
-    ? `Planet Pulse - ${country}`
+    ? `Planet Pulse - ${countryName}`
     : "Planet Pulse"}
 </title>
 
-<meta
-  name="description"
-  content="Planet Pulse AI-powered global news"
-/>
+<meta name="description" content="Planet Pulse AI-powered global news" />
 
 <style>
 :root{
@@ -57,16 +57,12 @@ if (country) {
   box-sizing:border-box;
 }
 
-html,
-body{
+html, body{
   width:100%;
   min-height:100%;
   background:var(--bg);
   color:var(--text);
-  font-family:
-    Inter,
-    system-ui,
-    sans-serif;
+  font-family: Inter, system-ui, sans-serif;
 }
 
 body{
@@ -75,23 +71,20 @@ body{
 
 a{
   text-decoration:none;
+  color:inherit;
 }
 
 .page{
   min-height:100vh;
   background:
-    radial-gradient(
-      circle at top,
-      rgba(79,195,255,.08),
-      transparent 40%
-    ),
+    radial-gradient(circle at top, rgba(79,195,255,.08), transparent 40%),
     #0f1115;
 }
 
 .hero{
   position:relative;
   width:100%;
-  height:220px;
+  height:200px;
   overflow:hidden;
   border-bottom:1px solid var(--border);
 }
@@ -99,14 +92,14 @@ a{
 .hero-inner{
   position:absolute;
   inset:0;
-  opacity:.85;
+  opacity:.75;
   pointer-events:none;
 }
 
 .content{
   width:min(1400px,95%);
   margin:auto;
-  padding:24px 0 50px;
+  padding:24px 0 60px;
 }
 
 .topbar{
@@ -122,19 +115,12 @@ a{
   display:inline-flex;
   align-items:center;
   gap:10px;
-
   padding:12px 18px;
-
   border-radius:16px;
-
   background:rgba(255,255,255,.05);
-
   border:1px solid var(--border);
-
   color:white;
-
   backdrop-filter:blur(12px);
-
   transition:.25s;
 }
 
@@ -145,41 +131,27 @@ a{
 
 .country-tag{
   padding:12px 18px;
-
   border-radius:16px;
-
   background:rgba(255,255,255,.04);
-
   border:1px solid var(--border);
-
   color:var(--accent);
-
   font-weight:700;
-
   letter-spacing:.05em;
+  text-transform:uppercase;
 }
 
 .news-grid{
   display:grid;
-  grid-template-columns:
-    repeat(
-      auto-fill,
-      minmax(320px,1fr)
-    );
-
+  grid-template-columns:repeat(auto-fill, minmax(320px,1fr));
   gap:22px;
 }
 
 .empty{
   padding:50px 20px;
   text-align:center;
-
   background:var(--card);
-
   border:1px solid var(--border);
-
   border-radius:24px;
-
   backdrop-filter:blur(20px);
 }
 
@@ -190,18 +162,11 @@ a{
 }
 
 @media (max-width:768px){
+  .hero{ height:150px; }
 
-  .hero{
-    height:160px;
-  }
+  .content{ width:94%; }
 
-  .content{
-    width:94%;
-  }
-
-  .news-grid{
-    grid-template-columns:1fr;
-  }
+  .news-grid{ grid-template-columns:1fr; }
 
   .topbar{
     align-items:stretch;
@@ -234,52 +199,35 @@ a{
 
         <div class="topbar">
 
-          <a
-            href="/"
-            class="back-btn"
-          >
+          <a href="/" class="back-btn">
             🌍 Back To Planet
           </a>
 
           <div class="country-tag">
-            {country}
+            {countryName}
           </div>
 
         </div>
 
         {
           articles.length ? (
-
             <div class="news-grid">
-              {
-                articles.map((article) => (
-                  <NewsCard
-                    title={article.title}
-                    description={article.description}
-                    link={article.link}
-                    date={article.date}
-                  />
-                ))
-              }
+              {articles.map((article) => (
+                <NewsCard
+                  title={article.title}
+                  description={article.description}
+                  link={article.link}
+                  date={article.date}
+                />
+              ))}
             </div>
-
           ) : (
-
             <div class="empty">
-              <h2>
-                No news available right now
-              </h2>
-
-              <p
-                style="
-                margin-top:12px;
-                color:#9aa3ad;
-                "
-              >
-                Please try again later.
+              <h2>No news available right now</h2>
+              <p style="margin-top:12px;color:#9aa3ad;">
+                Try again later or switch country.
               </p>
             </div>
-
           )
         }
 
