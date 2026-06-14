@@ -4,12 +4,14 @@ import { countries } from "../data/countries.js";
 
 <div id="planet-pulse-globe"></div>
 
-<script type="module" define:vars={{ countries }}>
-import * as THREE from "three";
+<script define:vars={{ countries }} type="module">
+import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 
 const container = document.getElementById("planet-pulse-globe");
+
 if (!container) throw new Error("Globe container not found");
 
+/* ---------- SCENE ---------- */
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
@@ -29,17 +31,15 @@ const renderer = new THREE.WebGLRenderer({
 
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-
 container.appendChild(renderer.domElement);
 
 /* ---------- STARFIELD ---------- */
-
 const starGeometry = new THREE.BufferGeometry();
 const starCount = 4000;
 
 const starPositions = new Float32Array(starCount * 3);
 
-for (let i = 0; i < starCount * 3; i++) {
+for (let i = 0; i < starPositions.length; i++) {
   starPositions[i] = (Math.random() - 0.5) * 1000;
 }
 
@@ -48,37 +48,37 @@ starGeometry.setAttribute(
   new THREE.BufferAttribute(starPositions, 3)
 );
 
-const starMaterial = new THREE.PointsMaterial({
-  size: 0.8,
-  color: 0xffffff,
-  transparent: true,
-  opacity: 0.9
-});
+const stars = new THREE.Points(
+  starGeometry,
+  new THREE.PointsMaterial({
+    size: 0.8,
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.9
+  })
+);
 
-const stars = new THREE.Points(starGeometry, starMaterial);
 scene.add(stars);
 
 /* ---------- GLOBE ---------- */
-
 const globeGroup = new THREE.Group();
 scene.add(globeGroup);
 
 const globeRadius = 3;
 
-const globeGeometry = new THREE.SphereGeometry(globeRadius, 64, 64);
+const globe = new THREE.Mesh(
+  new THREE.SphereGeometry(globeRadius, 64, 64),
+  new THREE.MeshBasicMaterial({
+    color: 0x2a3442,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.85
+  })
+);
 
-const globeMaterial = new THREE.MeshBasicMaterial({
-  color: 0x2a3442,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.85
-});
-
-const globe = new THREE.Mesh(globeGeometry, globeMaterial);
 globeGroup.add(globe);
 
 /* ---------- LAT/LNG ---------- */
-
 function latLngToVector3(lat, lng, radius) {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lng + 180) * (Math.PI / 180);
@@ -91,25 +91,20 @@ function latLngToVector3(lat, lng, radius) {
 }
 
 /* ---------- MARKERS ---------- */
-
 const markerGeometry = new THREE.SphereGeometry(0.04, 10, 10);
 const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x4fc3ff });
 
 const markers = [];
 
-countries.forEach((country) => {
+countries.forEach((c) => {
   const marker = new THREE.Mesh(markerGeometry, markerMaterial);
 
-  const pos = latLngToVector3(
-    country.lat,
-    country.lng,
-    globeRadius + 0.05
-  );
+  const pos = latLngToVector3(c.lat, c.lng, globeRadius + 0.05);
 
   marker.position.copy(pos);
 
   marker.userData = {
-    code: country.code,
+    code: c.code,
     targetPosition: pos.clone()
   };
 
@@ -118,46 +113,41 @@ countries.forEach((country) => {
 });
 
 /* ---------- RAYCAST ---------- */
-
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-
 let isAnimating = false;
 
-function performRaycast(clientX, clientY) {
+function onPick(x, y) {
   if (isAnimating) return;
 
-  pointer.x = (clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+  pointer.x = (x / window.innerWidth) * 2 - 1;
+  pointer.y = -(y / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(pointer, camera);
 
-  const hits = raycaster.intersectObjects(markers);
-  if (!hits.length) return;
-
-  focusCountry(hits[0].object);
+  const hit = raycaster.intersectObjects(markers)[0];
+  if (hit) focus(hit.object);
 }
 
-/* ---------- FOCUS ANIMATION ---------- */
-
-function focusCountry(marker) {
+/* ---------- FOCUS ---------- */
+function focus(marker) {
   isAnimating = true;
 
-  const countryCode = marker.userData.code.toLowerCase();
+  const code = marker.userData.code.toLowerCase();
 
   const startRotY = globeGroup.rotation.y;
   const startRotX = globeGroup.rotation.x;
 
-  const worldPos = marker.userData.targetPosition.clone();
+  const pos = marker.userData.targetPosition;
 
-  const targetRotY = Math.atan2(worldPos.x, worldPos.z);
-  const targetRotX = -Math.asin(worldPos.y / worldPos.length());
+  const targetRotY = Math.atan2(pos.x, pos.z);
+  const targetRotX = -Math.asin(pos.y / pos.length());
 
   const startZ = camera.position.z;
   const targetZ = 5.2;
 
-  const duration = 1200;
   const start = performance.now();
+  const duration = 1400;
 
   function animate(now) {
     const t = Math.min((now - start) / duration, 1);
@@ -175,7 +165,7 @@ function focusCountry(marker) {
     if (t < 1) {
       requestAnimationFrame(animate);
     } else {
-      window.location.href = `/?country=${countryCode}`;
+      window.location.href = `/?country=${code}`;
     }
   }
 
@@ -183,42 +173,29 @@ function focusCountry(marker) {
 }
 
 /* ---------- EVENTS ---------- */
+window.addEventListener("click", (e) => onPick(e.clientX, e.clientY), { passive: true });
 
-function onClick(e) {
-  performRaycast(e.clientX, e.clientY);
-}
-
-function onTouch(e) {
+window.addEventListener("touchend", (e) => {
   const t = e.changedTouches[0];
-  performRaycast(t.clientX, t.clientY);
-}
-
-window.addEventListener("click", onClick, { passive: true });
-window.addEventListener("touchend", onTouch, { passive: true });
+  onPick(t.clientX, t.clientY);
+}, { passive: true });
 
 /* ---------- RESIZE ---------- */
-
-function onResize() {
+window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-}
+});
 
-window.addEventListener("resize", onResize);
-
-/* ---------- ANIMATE ---------- */
-
-let frameId;
+/* ---------- LOOP ---------- */
+let frame;
 
 function animate() {
-  frameId = requestAnimationFrame(animate);
+  frame = requestAnimationFrame(animate);
 
-  if (!isAnimating) {
-    globeGroup.rotation.y += 0.0022;
-  }
-
+  if (!isAnimating) globeGroup.rotation.y += 0.0022;
   stars.rotation.y += 0.00015;
 
   renderer.render(scene, camera);
@@ -226,27 +203,10 @@ function animate() {
 
 animate();
 
-/* ---------- CLEANUP ---------- */
-
+/* ---------- CLEAN ---------- */
 window.addEventListener("beforeunload", () => {
-  cancelAnimationFrame(frameId);
-
-  window.removeEventListener("resize", onResize);
-  window.removeEventListener("click", onClick);
-  window.removeEventListener("touchend", onTouch);
-
-  globeGeometry.dispose();
-  globeMaterial.dispose();
-  markerGeometry.dispose();
-  markerMaterial.dispose();
-  starGeometry.dispose();
-  starMaterial.dispose();
-
+  cancelAnimationFrame(frame);
   renderer.dispose();
-
-  if (renderer.domElement && container.contains(renderer.domElement)) {
-    container.removeChild(renderer.domElement);
-  }
 });
 </script>
 
@@ -254,16 +214,13 @@ window.addEventListener("beforeunload", () => {
 #planet-pulse-globe {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100vh;
+  background: radial-gradient(circle, #131a22 0%, #050608 100%);
   overflow: hidden;
-  background: radial-gradient(circle at center, #131a22 0%, #0b0d10 60%, #050608 100%);
 }
 
 canvas {
   width: 100%;
   height: 100%;
   display: block;
-  touch-action: manipulation;
 }
 </style>
