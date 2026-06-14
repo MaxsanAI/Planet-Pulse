@@ -1,5 +1,3 @@
-import { getGoogleNewsCountry } from "./countryMap";
-
 const GOOGLE_NEWS_BASE =
   "https://news.google.com/rss/headlines/section/geo";
 
