@@ -3,7 +3,7 @@ import GlobeComponent from "../components/GlobeComponent.astro";
 import NewsCard from "../components/NewsCard.astro";
 import AiModal from "../components/AiModal.astro";
 import { parseRss } from "../utils/rssParser";
-import { countries } from "../data/countryMap";
+import { countries } from "../data/countryMap.js";
 
 const country =
   Astro.url.searchParams
